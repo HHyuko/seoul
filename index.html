@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"/>
+<title>단지 분석 (모바일)</title>
+<script src="https://cdn.plot.ly/plotly-2.30.0.min.js"></script>
+<style>
+html,body{margin:0;height:100%;overflow:hidden;font-family:-apple-system,BlinkMacSystemFont,"Apple SD Gothic Neo","Noto Sans KR",sans-serif;background:#f3f4f6}
+.wrap{height:100vh;display:flex;flex-direction:column}
+.top{background:#fff;padding:12px;border-bottom:1px solid #e5e7eb}
+.title{font-size:16px;font-weight:700;margin:0 0 8px}
+.row{display:flex;gap:8px}
+#region,#q,#btnReset{padding:10px;border-radius:12px;border:1px solid #d1d5db;font-size:14px}
+#q{flex:1}
+.bands{display:flex;gap:8px;overflow-x:auto;margin-top:8px}
+.band{padding:8px 12px;border-radius:999px;border:1px solid #d1d5db;font-size:13px;font-weight:700}
+.band.active{background:#111;color:#fff;border-color:#111}
+#plot{flex:1}
+.bottom{background:#fff;border-top:1px solid #e5e7eb;padding:10px;height:260px}
+.card{background:#f8fafc;border:1px solid #e5e7eb;border-radius:14px;padding:12px;height:100%;overflow:auto}
+.grid{display:grid;grid-template-columns:90px 1fr;gap:6px;font-size:13px}
+.k{color:#6b7280}
+.v{font-weight:600}
+.hint{color:#9ca3af;font-size:13px}
+</style>
+</head>
+
+<body>
+<div class="wrap">
+  <div class="top">
+    <div class="title">가격상승률 × 연평균 회전률</div>
+    <div class="row">
+      <select id="region">
+        <option value="__ALL__">전체 지역</option>
+      </select>
+      <input id="q" placeholder="단지명 검색"/>
+      <button id="btnReset">리셋</button>
+    </div>
+    <div class="bands" id="bands"></div>
+  </div>
+
+  <div id="plot"></div>
+
+  <div class="bottom">
+    <div class="card" id="info">
+      <div class="hint">점을 탭하거나 검색하세요.</div>
+    </div>
+  </div>
+</div>
+
+<script>
+/* ===== 여기에 기존 allData / monthMap 을 그대로 붙여 넣으세요 ===== */
+// const allData = [...];
+// const monthMap = {...};
+
+const BASE_MARKER_SIZE = 6;
+const ACTIVE_MARKER_SIZE = 12;
+
+let selectedRegion="__ALL__";
+let selectedBand=null;
+let searchKeyword="";
+
+const priceBands=[
+ {label:"~7억",min:0,max:70000},
+ {label:"7~10억",min:70000,max:100000},
+ {label:"10~15억",min:100000,max:150000},
+ {label:"15억+",min:150000,max:Infinity}
+];
+
+const plot=document.getElementById("plot");
+const info=document.getElementById("info");
+const regionSel=document.getElementById("region");
+const bandsEl=document.getElementById("bands");
+const search=document.getElementById("q");
+
+function getFiltered(){
+ let d=[...allData];
+ if(selectedRegion!=="__ALL__") d=d.filter(x=>x.region===selectedRegion);
+ if(selectedBand) d=d.filter(x=>x.price>=selectedBand.min && x.price<selectedBand.max);
+ if(searchKeyword) d=d.filter(x=>x.name.includes(searchKeyword));
+ return d;
+}
+
+function draw(){
+ const d=getFiltered();
+ Plotly.newPlot(plot,[{
+   x:d.map(v=>v.growth),
+   y:d.map(v=>v.turnover),
+   customdata:d,
+   text:d.map(v=>v.name),
+   mode:"markers",
+   type:"scatter",
+   marker:{size:BASE_MARKER_SIZE,opacity:1}
+ }],{margin:{t:20}});
+}
+
+plot.on("plotly_click",e=>{
+ const d=e.points[0].customdata;
+ const m=monthMap[d.name]||{};
+ info.innerHTML=`
+ <h4>${d.name}</h4>
+ <div class="grid">
+  <div class="k">지역</div><div class="v">${d.region}</div>
+  <div class="k">상승률</div><div class="v">${d.growth}%</div>
+  <div class="k">회전률</div><div class="v">${d.turnover}</div>
+  <div class="k">거래기간</div><div class="v">${m.min||"-"}~${m.max||"-"}</div>
+ </div>`;
+});
+
+priceBands.forEach(b=>{
+ const el=document.createElement("div");
+ el.className="band";
+ el.textContent=b.label;
+ el.onclick=()=>{
+  document.querySelectorAll(".band").forEach(x=>x.classList.remove("active"));
+  el.classList.add("active");
+  selectedBand=b;
+  draw();
+ };
+ bandsEl.appendChild(el);
+});
+
+regionSel.onchange=e=>{selectedRegion=e.target.value;draw();}
+search.oninput=e=>{searchKeyword=e.target.value.trim();draw();}
+document.getElementById("btnReset").onclick=()=>{
+ selectedRegion="__ALL__";selectedBand=null;searchKeyword="";
+ document.querySelectorAll(".band").forEach(x=>x.classList.remove("active"));
+ regionSel.value="__ALL__";search.value="";
+ info.innerHTML='<div class="hint">점을 탭하거나 검색하세요.</div>';
+ draw();
+};
+
+draw();
+</script>
+</body>
+</html>
